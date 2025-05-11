@@ -6,9 +6,9 @@ A tool to help patients find clinical trials relevant to their conditions using 
 
 Finding relevant clinical trials is incredibly difficult for patients:
 
-- ClinicalTrials.gov has poor search functionality
-- Trial keywords are inconsistent
-- Evaluating trial promise requires specialized knowledge
+- Existing trial databases like ClinicalTrials.gov and AACT have limited search functionality
+- Trial keywords and terminology are inconsistent
+- Evaluating trial promise requires specialized medical knowledge
 - Eligibility criteria are complex and unique to each trial
 
 ## Solution
@@ -41,16 +41,16 @@ This tool aims to:
 
 ### Download Clinical Trial Data
 
-To search for clinical trials:
+To download the latest clinical trial dataset from AACT:
 
 ```bash
-./scripts/download_trials.py --query "head and neck cancer" --max-results 100
+./scripts/download_trials.py
 ```
 
-To download the bulk data:
+For testing without downloading the large dataset:
 
 ```bash
-./scripts/download_trials.py --bulk
+./scripts/download_trials.py --test-mode
 ```
 
 For more options:
@@ -70,13 +70,13 @@ export ANTHROPIC_API_KEY=your_api_key_here
 Process downloaded trials:
 
 ```bash
-./scripts/process_trials.py --input-file data/raw/search_head_and_neck_cancer_20250511.json
+./scripts/process_trials.py --input-file data/raw/aact_dataset_20250511.zip
 ```
 
 You can process a subset of trials for testing:
 
 ```bash
-./scripts/process_trials.py --input-file data/raw/search_results.json --max-trials 5
+./scripts/process_trials.py --input-file data/raw/aact_dataset_sample_20250511.json --max-trials 5
 ```
 
 For more options:
