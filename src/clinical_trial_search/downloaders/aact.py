@@ -7,6 +7,8 @@ methods to download these static copies.
 
 import logging
 import re
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
@@ -109,21 +111,35 @@ class AACTDownloader:
             output_file: Local file path to save to
         """
         logger.info(f"Downloading file from {url}")
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
 
-        # Get the total size if available for progress bar
-        total_size = int(response.headers.get("content-length", 0))
-        with open(output_file, "wb") as f:
-            with tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=f"Downloading {output_file.name}",
-            ) as progress_bar:
-                for chunk in response.iter_bytes(chunk_size=8192):
-                    f.write(chunk)
-                    progress_bar.update(len(chunk))
+        # Download to a temp file so we only move into the final location if the download completes
+        with tempfile.NamedTemporaryFile(
+            delete=True, dir=output_file.parent, suffix=".tmp"
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+
+            async with client.stream("GET", url, follow_redirects=True) as response:
+                response.raise_for_status()
+
+                # Get the total size if available for progress bar
+                total_size = int(response.headers.get("content-length", 0))
+
+                with tqdm(
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=f"Downloading {output_file.name}",
+                ) as progress_bar:
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        temp_file.write(chunk)
+                        progress_bar.update(len(chunk))
+
+            # Flush the file before moving it
+            temp_file.flush()
+
+            # Move the temp file to the final location
+            shutil.move(temp_path, output_file)
+            logger.info("Download completed successfully")
 
     async def download_latest_dataset(self) -> Path:
         """Download the latest dataset from AACT.
@@ -145,16 +161,24 @@ class AACTDownloader:
         dataset_url = await self.get_latest_dataset_url()
         expected_filename = await self.get_dataset_filename(dataset_url)
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(dataset_url, follow_redirects=True)
-            response.raise_for_status()
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            # First try a HEAD request to check content type without downloading the content
+            logger.info(f"Checking dataset URL with HEAD request: {dataset_url}")
+            head_response = await client.head(dataset_url, follow_redirects=True)
+            head_response.raise_for_status()
 
             # If we got redirected to download the file directly,
             # the content should be the zip file
-            if response.headers.get("content-type") == "application/zip":
+            if head_response.headers.get("content-type") == "application/zip":
+                logger.info("Dataset URL is a direct zip file download")
                 await self._download_file(client, dataset_url, output_file)
             else:
-                # Otherwise, we need to find the download link on the page
+                logger.info("Dataset URL is a page, need to find download link")
+                # Get the HTML page that contains the download link
+                response = await client.get(dataset_url, follow_redirects=True)
+                response.raise_for_status()
+
+                # Parse HTML to find download link
                 soup = BeautifulSoup(response.text, "html.parser")
                 download_link = None
 
@@ -173,6 +197,7 @@ class AACTDownloader:
                 # Ensure download_link is a string for urljoin
                 link_str = str(download_link)
                 file_url = urljoin(AACT_BASE_URL, link_str)
+                logger.info(f"Found download link: {file_url}")
                 await self._download_file(client, file_url, output_file)
 
         logger.info(f"Dataset downloaded to {output_file}")
