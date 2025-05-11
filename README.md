@@ -53,6 +53,12 @@ To download the bulk data:
 ./scripts/download_trials.py --bulk
 ```
 
+For more options:
+
+```bash
+./scripts/download_trials.py --help
+```
+
 ### Process Trials with LLM
 
 Set your API key for the LLM service:
@@ -67,11 +73,48 @@ Process downloaded trials:
 ./scripts/process_trials.py --input-file data/raw/search_head_and_neck_cancer_20250511.json
 ```
 
+You can process a subset of trials for testing:
+
+```bash
+./scripts/process_trials.py --input-file data/raw/search_results.json --max-trials 5
+```
+
+For more options:
+
+```bash
+./scripts/process_trials.py --help
+```
+
+### Understanding the LLM-Generated Tags
+
+The LLM processor analyzes each trial and generates the following tags:
+
+1. **Standardized condition tags**: Normalized terms for the same conditions
+2. **Mechanism categorization**: Categorizes the trial by primary mechanism (e.g., immunotherapy)
+3. **Simplified eligibility summary**: Plain language bullets of eligibility criteria
+4. **Inclusion criteria tags**: Key inclusion criteria (e.g., "no prior treatment")
+5. **Exclusion criteria tags**: Key exclusion criteria (e.g., "brain metastases")
+6. **Treatment target tags**: Specific genes, proteins, or pathways targeted
+7. **Relevance scores**: Scores from 1-5 for different disease stages
+
 ## Architecture
 
 - `src/clinical_trial_search/downloaders/`: Download clinical trial data
 - `src/clinical_trial_search/processors/`: Process and analyze trial data with LLMs
 - `scripts/`: Command-line utilities
+
+## Future Roadmap
+
+- Web interface for searching processed trials
+- Database storage for tagged trials
+- Enhanced LLM prompts for better tagging accuracy
+- Patient-specific matching against eligibility criteria
+- Integration with other clinical trial sources
+- Trial relevance ranking based on patient profiles
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## Development Status
 

@@ -33,10 +33,39 @@ pytest
 
 ## Project Structure
 
-- `src/` - Source code
+- `src/clinical_trial_search/` - Main package source code
+  - `downloaders/` - Trial data downloading components
+  - `processors/` - LLM processing and tagging components
 - `data/` - Data files
-- `scripts/` - Utility scripts
+  - `raw/` - Raw downloaded trial data
+- `scripts/` - Command-line utilities
+  - `download_trials.py` - Script to download trial data
+  - `process_trials.py` - Script to process trials with LLMs
+- `tests/` - Test files (to be implemented)
+
+## Key Files
+
+- `src/clinical_trial_search/downloaders/clinicaltrials_gov.py` - ClinicalTrials.gov data downloader
+- `src/clinical_trial_search/processors/llm_tagger.py` - LLM processor for trial tagging
+
+## Prompt Engineering
+
+The LLM tagger uses a carefully designed prompt that instructs the model to:
+- Analyze clinical trial information
+- Generate standardized tags for conditions
+- Simplify eligibility criteria into plain language
+- Categorize trials by mechanism and targets
+- Score relevance for different disease stages
+
+The prompt can be found in `generate_trial_tags()` method in `llm_tagger.py`.
 
 ## Git Workflow
 
 Always run linting and type checking before committing changes. The pre-commit hooks should handle this automatically.
+
+## Customizing LLM Configuration
+
+The LLM processor accepts the following configurations:
+- `api_key`: API key for the LLM service
+- `api_url`: URL for the LLM API (defaults to Anthropic's Claude API)
+- `model`: Model to use (defaults to claude-3-sonnet-20240229)
