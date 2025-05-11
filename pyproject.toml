@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clinical-trial-search"
+version = "0.1.0"
+description = "A tool to help patients find clinical trials relevant to their conditions"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+dependencies = [
+    "httpx>=0.24.0",
+    "tqdm>=4.65.0",
+    "tenacity>=8.2.2",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.9",
+    "pyright>=1.1.400",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.0.270",
+    "pyright>=1.1.300",
+    "pre-commit>=3.3.2",
+    "pytest>=7.3.1",
+    "pytest-asyncio>=0.21.0",
+]
+
+[tool.ruff]
+line-length = 100
+lint.select = ["E", "F", "I", "W", "B", "N", "UP", "ERA", "RUF"]
+lint.ignore = ["E203"]
+lint.extend-safe-fixes = ["UP006", "UP035"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["clinical_trial_search"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/__pycache__", "build", "dist"]
+reportMissingImports = true
+reportPrivateImportUsage = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
