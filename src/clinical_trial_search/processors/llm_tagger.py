@@ -12,8 +12,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from anthropic import AsyncAnthropic
+from anthropic.types import TextBlock
 
 logger = logging.getLogger(__name__)
 
@@ -23,27 +23,22 @@ class LLMProcessor:
 
     def __init__(
         self,
-        api_key: str | None = None,
-        api_url: str | None = None,
-        model: str = "claude-3-sonnet-20240229",
+        api_key: str,
+        model: str = "claude-3-5-haiku-latest",
     ) -> None:
         """Initialize the LLM processor.
 
         Args:
             api_key: API key for the LLM service
-            api_url: URL for the LLM API
+            api_url: URL for the LLM API (not used with official client)
             model: Model to use for processing
         """
         self.api_key = api_key
-        self.api_url = api_url or "https://api.anthropic.com/v1/messages"
         self.model = model
+        self.client = AsyncAnthropic(api_key=api_key)
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-    )
     async def _call_llm(self, prompt: str) -> str:
-        """Call the LLM API.
+        """Call the LLM API using the official Anthropic Python client.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -51,32 +46,21 @@ class LLMProcessor:
         Returns:
             The LLM response text
         """
-        if not self.api_key:
-            raise ValueError("API key is required for LLM processing")
+        response = await self.client.messages.create(
+            model=self.model,
+            max_tokens=4000,
+            temperature=0,
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01",
-        }
-
-        data = {
-            "model": self.model,
-            "max_tokens": 4000,
-            "temperature": 0,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.api_url,
-                headers=headers,
-                json=data,
-                timeout=60,
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["content"][0]["text"]
+        # Extract text from response
+        content = ""
+        for block in response.content:
+            if isinstance(block, TextBlock):
+                content += block.text
+            else:
+                logger.debug(f"Skipping non-text block in response: {block}")
+        return content
 
     async def generate_trial_tags(self, trial_data: dict[str, Any]) -> dict[str, Any]:
         """Generate tags and metadata for a clinical trial.
@@ -188,15 +172,9 @@ Your response should ONLY be properly formatted JSON with these fields.
 
         # Process each trial
         for trial in trials:
-            try:
-                logger.info(f"Processing trial {trial.get('NCTId', 'unknown')}")
-                processed_trial = await self.generate_trial_tags(trial)
-                results.append(processed_trial)
-            except Exception as e:
-                logger.error(f"Error processing trial: {e!s}")
-                # Add error information and continue with next trial
-                trial["llm_generated_tags"] = {"error": str(e)}
-                results.append(trial)
+            logger.info(f"Processing trial {trial.get('NCTId', 'unknown')}")
+            processed_trial = await self.generate_trial_tags(trial)
+            results.append(processed_trial)
 
         # Save results if output file specified
         if output_file:
