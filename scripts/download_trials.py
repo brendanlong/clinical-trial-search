@@ -11,20 +11,16 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.clinical_trial_search.downloaders.aact import AACTDownloader
+from src.clinical_trial_search.utils.logging import setup_colored_logging
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Set up logging configuration.
+    """Set up logging configuration with colored output.
 
     Args:
         verbose: Whether to enable verbose logging
     """
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler()],
-    )
+    setup_colored_logging(verbose)
 
 
 async def main() -> None:
