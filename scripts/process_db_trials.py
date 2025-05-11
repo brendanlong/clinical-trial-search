@@ -86,32 +86,25 @@ async def process_trials(
                 "EligibilityCriteria": trial.get("eligibility", {}).get("criteria", ""),
             }
 
-            try:
-                # Process the trial with LLM
-                processed_trial = await llm_processor.generate_trial_tags(llm_input)
-                llm_tags = processed_trial.get("llm_generated_tags", {})
+            # Process the trial with LLM
+            processed_trial = await llm_processor.generate_trial_tags(llm_input)
+            llm_tags = processed_trial.get("llm_generated_tags", {})
 
-                # Check if processing was successful
-                success = "error" not in llm_tags
+            # Check if processing was successful
+            success = "error" not in llm_tags
 
-                if success:
-                    # Save the trial tags to the database
-                    logger.info(f"Saving tags for trial {nct_id}")
-                    await db_connector.save_trial_tags(nct_id, llm_tags)
-                else:
-                    logger.error(
-                        f"Error processing trial {nct_id}: {llm_tags.get('error', 'Unknown error')}"
-                    )
+            if success:
+                # Save the trial tags to the database
+                logger.info(f"Saving tags for trial {nct_id}")
+                await db_connector.save_trial_tags(nct_id, llm_tags)
+            else:
+                logger.error(
+                    f"Error processing trial {nct_id}: {llm_tags.get('error', 'Unknown error')}"
+                )
 
-                # Mark the trial as processed
-                await db_connector.mark_trial_processed(nct_id, success=success)
-                processed_count += 1
-
-            except Exception as e:
-                logger.error(f"Exception processing trial {nct_id}: {e}")
-                # Mark the trial as processed but unsuccessful
-                await db_connector.mark_trial_processed(nct_id, success=False)
-                processed_count += 1
+            # Mark the trial as processed
+            await db_connector.mark_trial_processed(nct_id, success=success)
+            processed_count += 1
 
         if max_trials is not None:
             remaining = max_trials - processed_count
@@ -205,11 +198,7 @@ async def main() -> None:
     )
 
     # Connect to the database
-    try:
-        await db_connector.connect()
-    except Exception as e:
-        logger.error(f"Failed to connect to the database: {e}")
-        sys.exit(1)
+    await db_connector.connect()
 
     # Initialize LLM processor
     llm_processor = LLMProcessor(

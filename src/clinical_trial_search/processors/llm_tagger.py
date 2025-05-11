@@ -128,33 +128,28 @@ Based on this information, provide the following in JSON format:
 Your response should ONLY be properly formatted JSON with these fields.
 """  # noqa
 
+        response = await self._call_llm(prompt)
+
+        # Extract JSON from the response
         try:
-            response = await self._call_llm(prompt)
+            json_start = response.find("{")
+            json_end = response.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = response[json_start:json_end]
+                tags_data = json.loads(json_str)
+            else:
+                # Fallback if no JSON found
+                tags_data = {"error": "Could not extract JSON from LLM response"}
+                logger.error(f"Could not extract JSON from LLM response: {response}")
+        except json.JSONDecodeError:
+            tags_data = {"error": "Failed to parse JSON from LLM response"}
+            logger.error(f"Failed to parse JSON from LLM response: {response}")
 
-            # Extract JSON from the response
-            try:
-                json_start = response.find("{")
-                json_end = response.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = response[json_start:json_end]
-                    tags_data = json.loads(json_str)
-                else:
-                    # Fallback if no JSON found
-                    tags_data = {"error": "Could not extract JSON from LLM response"}
-                    logger.error(f"Could not extract JSON from LLM response: {response}")
-            except json.JSONDecodeError:
-                tags_data = {"error": "Failed to parse JSON from LLM response"}
-                logger.error(f"Failed to parse JSON from LLM response: {response}")
+        # Merge original data with the new tags
+        result = trial_data.copy()
+        result["llm_generated_tags"] = tags_data
 
-            # Merge original data with the new tags
-            result = trial_data.copy()
-            result["llm_generated_tags"] = tags_data
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Error processing trial {trial_info['nct_id']}: {e!s}")
-            return {**trial_data, "llm_generated_tags": {"error": str(e)}}
+        return result
 
     async def process_trials_batch(
         self, trials: list[dict[str, Any]], output_file: str | Path | None = None

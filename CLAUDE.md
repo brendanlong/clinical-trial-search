@@ -15,6 +15,8 @@ Clinical Trial Search is a Python project aimed at improving the process of find
 - ruff for linting and formatting
 - pyright for type checking
 - pre-commit for git hooks
+- Don't add comments that are obvious
+- Don't catch exceptions just to log them, prefer to let exceptions get thrown
 
 ## Important Commands to Run
 
@@ -88,10 +90,3 @@ The prompt can be found in `generate_trial_tags()` method in `llm_tagger.py`.
 ## Git Workflow
 
 Always run linting and type checking before committing changes. The pre-commit hooks should handle this automatically.
-
-## Customizing LLM Configuration
-
-The LLM processor accepts the following configurations:
-- `api_key`: API key for the LLM service
-- `api_url`: URL for the LLM API (defaults to Anthropic's Claude API)
-- `model`: Model to use (defaults to claude-3-sonnet-20240229)
