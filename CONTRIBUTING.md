@@ -45,6 +45,44 @@ We use [pre-commit](https://pre-commit.com/) to run checks automatically before 
    - Make sure Docker and Docker Compose are installed
    - Download the AACT dataset using `./scripts/download_trials.py`
    - Run `./scripts/load_aact_data.sh` to start PostgreSQL and load the data
+   - Run `./scripts/setup_ctsearch_db.sh` to set up the enhanced search schema
+
+## Database Schema
+
+### AACT Schema (`ctgov`)
+
+The AACT database uses the `ctgov` schema. See [AACT_DB.md](AACT_DB.md) for detailed information about the database structure and important tables.
+
+### Clinical Trial Search Schema (`ctsearch`)
+
+The project extends the AACT database with a custom `ctsearch` schema that stores LLM-processed data. Key tables include:
+
+- `processed_trials`: Tracks which trials have been processed
+- `condition_tags` and `trial_conditions`: Stores comprehensive condition tags
+- `mechanism_categories` and `trial_mechanisms`: Categorizes trials by mechanism
+- `treatment_targets` and `trial_targets`: Stores treatment targets
+- `disease_stages` and `trial_stage_relevance`: Stores relevance by disease stage
+- `simplified_eligibility`: Plain language eligibility summaries
+- `criteria_tags` and `trial_criteria`: Stores inclusion/exclusion criteria tags
+- `countries` and `trial_countries`: Geographic location information
+
+The schema uses a fully relational approach with proper foreign keys and indexes for efficient searching. See [scripts/setup_ctsearch_db.sql](scripts/setup_ctsearch_db.sql) for the complete schema definition.
+
+## LLM Processing
+
+The LLM processor (`src/clinical_trial_search/processors/llm_tagger.py`) uses Anthropic's Claude to analyze clinical trial data and generate structured tags. The processor:
+
+1. Takes raw trial data as input
+2. Constructs a prompt with relevant trial information
+3. Sends the prompt to the LLM
+4. Parses the JSON response into structured data
+
+Please follow these guidelines when modifying the LLM tagger:
+
+- Keep the prompts clear and focused on specific tagging tasks
+- Ensure error handling for malformed LLM responses
+- Test with a small number of trials before processing large batches
+- Maintain the JSON structure expected by the database schema
 
 ## Code Style
 

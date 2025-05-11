@@ -75,6 +75,14 @@ This will:
 - Extract the database dump from the downloaded AACT dataset
 - Load the data into PostgreSQL
 
+After loading the AACT data, you need to set up the enhanced search schema:
+
+```bash
+./scripts/setup_ctsearch_db.sh
+```
+
+This creates a separate `ctsearch` schema with tables designed for LLM-tagged data.
+
 To manually control the database container:
 
 ```bash
@@ -101,6 +109,18 @@ The AACT (Aggregate Analysis of ClinicalTrials.gov) database contains comprehens
 - Includes conditions, interventions, eligibility criteria, and more
 
 See [AACT_DB.md](AACT_DB.md) for a detailed explanation of the database structure and important tables/columns for this project.
+
+### LLM-Enhanced Database Schema
+
+This project extends the AACT database with a custom schema (`ctsearch`) that stores LLM-processed data in a structured format, including:
+
+- Comprehensive condition tagging (instead of normalizing to a single term)
+- Treatment mechanisms and targets
+- Disease stage relevance scoring
+- Plain language eligibility criteria
+- Geographic location information
+
+The schema uses a fully relational approach with proper foreign keys and indexes for efficient searching. See the [scripts/setup_ctsearch_db.sql](scripts/setup_ctsearch_db.sql) file for the complete schema definition.
 
 ### Process Trials with LLM
 
@@ -132,7 +152,7 @@ For more options:
 
 The LLM processor analyzes each trial and generates the following tags:
 
-1. **Standardized condition tags**: Normalized terms for the same conditions
+1. **Standardized condition tags**: Comprehensive tags for all relevant conditions
 2. **Mechanism categorization**: Categorizes the trial by primary mechanism (e.g., immunotherapy)
 3. **Simplified eligibility summary**: Plain language bullets of eligibility criteria
 4. **Inclusion criteria tags**: Key inclusion criteria (e.g., "no prior treatment")
