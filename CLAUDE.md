@@ -11,6 +11,7 @@ Clinical Trial Search is a Python project aimed at improving the process of find
 - Python project using uv for package management
   - Always use `uv add <package>` to install dependencies
   - After adding dependencies to pyproject.toml, run `uv sync` to update lock file
+- Docker and Docker Compose for PostgreSQL database management
 - ruff for linting and formatting
 - pyright for type checking
 - pre-commit for git hooks
@@ -33,22 +34,26 @@ pyright
 pytest
 ```
 
+For database operations:
+
+```bash
+# Start PostgreSQL database
+docker-compose up -d
+
+# Stop PostgreSQL database
+docker-compose down
+```
+
 ## Project Structure
 
-- `src/clinical_trial_search/` - Main package source code
-  - `downloaders/` - Trial data downloading components
-  - `processors/` - LLM processing and tagging components
-- `data/` - Data files
-  - `raw/` - Raw downloaded trial data
-- `scripts/` - Command-line utilities
-  - `download_trials.py` - Script to download trial data
-  - `process_trials.py` - Script to process trials with LLMs
-- `tests/` - Test files (to be implemented)
+Use `tree` on startup to understand the project structure.
 
 ## Key Files
 
 - `src/clinical_trial_search/downloaders/aact.py` - AACT data downloader (downloads from AACT's static database copies)
 - `src/clinical_trial_search/processors/llm_tagger.py` - LLM processor for trial tagging
+- `docker-compose.yml` - Docker Compose configuration for PostgreSQL
+- `scripts/load_aact_data.sh` - Script to load AACT data into PostgreSQL
 
 ## Prompt Engineering
 

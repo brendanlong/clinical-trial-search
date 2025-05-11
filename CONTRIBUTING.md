@@ -2,7 +2,7 @@
 
 ## Development Environment
 
-This project is developed in Python. We use the following tools:
+This project is developed in Python and uses Docker for database management. We use the following tools:
 
 ### uv
 
@@ -12,6 +12,13 @@ To install uv:
 ```bash
 pip install uv
 ```
+
+### Docker and Docker Compose
+
+We use Docker and Docker Compose to set up and manage a PostgreSQL database for the AACT clinical trial data. Make sure you have both installed on your system:
+
+- [Install Docker](https://docs.docker.com/get-docker/)
+- [Install Docker Compose](https://docs.docker.com/compose/install/)
 
 ### ruff
 
@@ -34,6 +41,10 @@ We use [pre-commit](https://pre-commit.com/) to run checks automatically before 
    - On Windows: `.venv\Scripts\activate`
 4. Run `uv pip install -e '.[dev]'` to install dependencies including development tools
 5. Run `pre-commit install` to install the pre-commit hooks
+6. To set up the PostgreSQL database with AACT data:
+   - Make sure Docker and Docker Compose are installed
+   - Download the AACT dataset using `./scripts/download_trials.py`
+   - Run `./scripts/load_aact_data.sh` to start PostgreSQL and load the data
 
 ## Code Style
 

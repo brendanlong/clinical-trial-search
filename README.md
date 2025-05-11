@@ -59,6 +59,38 @@ For more options:
 ./scripts/download_trials.py --help
 ```
 
+### Setup PostgreSQL Database
+
+The project includes Docker configuration to set up a PostgreSQL database for the AACT data:
+
+1. Make sure Docker and Docker Compose are installed on your system
+2. Run the provided script to start PostgreSQL and load the AACT data:
+
+```bash
+./scripts/load_aact_data.sh
+```
+
+This will:
+- Start a PostgreSQL 17.5 container
+- Extract the database dump from the downloaded AACT dataset
+- Load the data into PostgreSQL
+
+To manually control the database container:
+
+```bash
+# Start the PostgreSQL container
+docker-compose up -d
+
+# Stop the PostgreSQL container
+docker-compose down
+```
+
+To connect to the database:
+
+```bash
+docker exec -it clinical-trial-postgres psql -U postgres -d aact
+```
+
 ### Process Trials with LLM
 
 Set your API key for the LLM service:
@@ -106,7 +138,6 @@ The LLM processor analyzes each trial and generates the following tags:
 ## Future Roadmap
 
 - Web interface for searching processed trials
-- Database storage for tagged trials
 - Enhanced LLM prompts for better tagging accuracy
 - Patient-specific matching against eligibility criteria
 - Integration with other clinical trial sources
