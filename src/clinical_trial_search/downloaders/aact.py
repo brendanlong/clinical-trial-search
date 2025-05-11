@@ -100,6 +100,31 @@ class AACTDownloader:
 
         return filename
 
+    async def _download_file(self, client: httpx.AsyncClient, url: str, output_file: Path) -> None:
+        """Download a file with progress tracking.
+
+        Args:
+            client: HTTP client to use for the request
+            url: URL to download from
+            output_file: Local file path to save to
+        """
+        logger.info(f"Downloading file from {url}")
+        response = await client.get(url, follow_redirects=True)
+        response.raise_for_status()
+
+        # Get the total size if available for progress bar
+        total_size = int(response.headers.get("content-length", 0))
+        with open(output_file, "wb") as f:
+            with tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc=f"Downloading {output_file.name}",
+            ) as progress_bar:
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    f.write(chunk)
+                    progress_bar.update(len(chunk))
+
     async def download_latest_dataset(self) -> Path:
         """Download the latest dataset from AACT.
 
@@ -127,18 +152,7 @@ class AACTDownloader:
             # If we got redirected to download the file directly,
             # the content should be the zip file
             if response.headers.get("content-type") == "application/zip":
-                # Get the total size if available for progress bar
-                total_size = int(response.headers.get("content-length", 0))
-                with open(output_file, "wb") as f:
-                    with tqdm(
-                        total=total_size,
-                        unit="B",
-                        unit_scale=True,
-                        desc=f"Downloading {output_file.name}",
-                    ) as progress_bar:
-                        for chunk in response.iter_bytes(chunk_size=8192):
-                            f.write(chunk)
-                            progress_bar.update(len(chunk))
+                await self._download_file(client, dataset_url, output_file)
             else:
                 # Otherwise, we need to find the download link on the page
                 soup = BeautifulSoup(response.text, "html.parser")
@@ -156,27 +170,10 @@ class AACTDownloader:
                 if not download_link:
                     raise ValueError(f"Could not find download link for {expected_filename}")
 
-                # Download the actual file
                 # Ensure download_link is a string for urljoin
                 link_str = str(download_link)
                 file_url = urljoin(AACT_BASE_URL, link_str)
-                logger.info(f"Downloading dataset from {file_url}")
-
-                file_response = await client.get(file_url, follow_redirects=True)
-                file_response.raise_for_status()
-
-                # Get the total size if available for progress bar
-                total_size = int(file_response.headers.get("content-length", 0))
-                with open(output_file, "wb") as f:
-                    with tqdm(
-                        total=total_size,
-                        unit="B",
-                        unit_scale=True,
-                        desc=f"Downloading {output_file.name}",
-                    ) as progress_bar:
-                        for chunk in file_response.iter_bytes(chunk_size=8192):
-                            f.write(chunk)
-                            progress_bar.update(len(chunk))
+                await self._download_file(client, file_url, output_file)
 
         logger.info(f"Dataset downloaded to {output_file}")
         return output_file
