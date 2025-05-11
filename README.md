@@ -91,6 +91,17 @@ To connect to the database:
 docker exec -it clinical-trial-postgres psql -U postgres -d aact
 ```
 
+#### About the AACT Database
+
+The AACT (Aggregate Analysis of ClinicalTrials.gov) database contains comprehensive information about clinical trials from ClinicalTrials.gov. Key features:
+
+- Updated daily with new trial information
+- Contains detailed trial protocol and results data
+- Structured as a relational PostgreSQL database
+- Includes conditions, interventions, eligibility criteria, and more
+
+See [AACT_DB.md](AACT_DB.md) for a detailed explanation of the database structure and important tables/columns for this project.
+
 ### Process Trials with LLM
 
 Set your API key for the LLM service:
