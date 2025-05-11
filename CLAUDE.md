@@ -9,6 +9,8 @@ Clinical Trial Search is a Python project aimed at improving the process of find
 ## Development Setup
 
 - Python project using uv for package management
+  - Always use `uv add <package>` to install dependencies
+  - After adding dependencies to pyproject.toml, run `uv sync` to update lock file
 - ruff for linting and formatting
 - pyright for type checking
 - pre-commit for git hooks
@@ -45,7 +47,7 @@ pytest
 
 ## Key Files
 
-- `src/clinical_trial_search/downloaders/clinicaltrials_gov.py` - ClinicalTrials.gov data downloader
+- `src/clinical_trial_search/downloaders/aact.py` - AACT data downloader (downloads from AACT's static database copies)
 - `src/clinical_trial_search/processors/llm_tagger.py` - LLM processor for trial tagging
 
 ## Prompt Engineering
