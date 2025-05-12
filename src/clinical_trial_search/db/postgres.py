@@ -1,6 +1,7 @@
 """PostgreSQL database connector for clinical trial search."""
 
 import asyncio
+import json
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -91,85 +92,6 @@ class PostgresConnector:
         async with self._pool.acquire() as conn:
             yield conn
 
-    async def find_unprocessed_trial(self) -> dict[str, Any] | None:
-        """Find a single clinical trial that hasn't been processed yet.
-
-        This method finds trials that exist in the ctgov.studies table but not in
-        the ctsearch.processed_trials table.
-
-        Returns:
-            A dictionary with trial data or None if no unprocessed trials are found
-        """
-        async with self.acquire() as conn:
-            # Find one trial that hasn't been processed yet
-            study = await conn.fetchrow(
-                """
-                SELECT
-                    s.nct_id,
-                    s.brief_title,
-                    s.official_title,
-                    s.phase,
-                    s.overall_status,
-                    s.study_type,
-                    bs.description as brief_summary,
-                    dd.description as detailed_description
-                FROM
-                    ctgov.studies s
-                LEFT JOIN
-                    ctgov.brief_summaries bs ON s.nct_id = bs.nct_id
-                LEFT JOIN
-                    ctgov.detailed_descriptions dd ON s.nct_id = dd.nct_id
-                LEFT JOIN
-                    ctsearch.processed_trials pt ON s.nct_id = pt.nct_id
-                WHERE
-                    pt.nct_id IS NULL
-                LIMIT 1
-                """
-            )
-
-            if not study:
-                return None
-
-            # Get condition data
-            conditions = await conn.fetch(
-                """
-                SELECT name
-                FROM ctgov.conditions
-                WHERE nct_id = $1
-                """,
-                study["nct_id"],
-            )
-
-            # Get intervention data
-            interventions = await conn.fetch(
-                """
-                SELECT intervention_type, name, description
-                FROM ctgov.interventions
-                WHERE nct_id = $1
-                """,
-                study["nct_id"],
-            )
-
-            # Get eligibility criteria
-            eligibility = await conn.fetchrow(
-                """
-                SELECT criteria, gender, minimum_age, maximum_age
-                FROM ctgov.eligibilities
-                WHERE nct_id = $1
-                """,
-                study["nct_id"],
-            )
-
-            # Convert row objects to dictionaries
-            study_dict = dict(study)
-
-            # Add related data
-            study_dict["conditions"] = [c["name"] for c in conditions]
-            study_dict["interventions"] = [dict(i) for i in interventions]
-            study_dict["eligibility"] = dict(eligibility) if eligibility else {}
-
-            return study_dict
-
     async def find_unprocessed_trials(self, limit: int = 10) -> list[dict[str, Any]]:
         """Find multiple clinical trials that haven't been processed yet.
 
@@ -180,7 +102,7 @@ class PostgresConnector:
             A list of dictionaries with trial data
         """
         async with self.acquire() as conn:
-            # Find trials that haven't been processed yet
+            # Get all trial data in a single query using JSON aggregation
             studies = await conn.fetch(
                 """
                 SELECT
@@ -189,13 +111,44 @@ class PostgresConnector:
                     s.official_title,
                     s.phase,
                     s.overall_status,
-                    s.study_type
+                    s.study_type,
+                    bs.description as brief_summary,
+                    dd.description as detailed_description,
+                    (
+                        SELECT jsonb_agg(c.name)
+                        FROM ctgov.conditions c
+                        WHERE c.nct_id = s.nct_id
+                    ) as conditions,
+                    (
+                        SELECT jsonb_agg(jsonb_build_object(
+                            'intervention_type', i.intervention_type,
+                            'name', i.name,
+                            'description', i.description
+                        ))
+                        FROM ctgov.interventions i
+                        WHERE i.nct_id = s.nct_id
+                    ) as interventions,
+                    (
+                        SELECT jsonb_build_object(
+                            'criteria', e.criteria,
+                            'gender', e.gender,
+                            'minimum_age', e.minimum_age,
+                            'maximum_age', e.maximum_age
+                        )
+                        FROM ctgov.eligibilities e
+                        WHERE e.nct_id = s.nct_id
+                    ) as eligibility
                 FROM
                     ctgov.studies s
+                LEFT JOIN
+                    ctgov.brief_summaries bs ON s.nct_id = bs.nct_id
+                LEFT JOIN
+                    ctgov.detailed_descriptions dd ON s.nct_id = dd.nct_id
                 LEFT JOIN
                     ctsearch.processed_trials pt ON s.nct_id = pt.nct_id
                 WHERE
                     pt.nct_id IS NULL
+                    AND s.completion_date IS NULL
                 LIMIT $1
                 """,
                 limit,
@@ -208,63 +161,21 @@ class PostgresConnector:
             for study in studies:
                 study_dict = dict(study)
 
-                # Get brief summary
-                brief_summary = await conn.fetchrow(
-                    """
-                    SELECT description
-                    FROM ctgov.brief_summaries
-                    WHERE nct_id = $1
-                    """,
-                    study["nct_id"],
-                )
-                if brief_summary:
-                    study_dict["brief_summary"] = brief_summary["description"]
+                # Parse JSON fields from PostgreSQL
+                if study_dict["conditions"] is None:
+                    study_dict["conditions"] = []
+                else:
+                    study_dict["conditions"] = json.loads(study_dict["conditions"])
 
-                # Get detailed description
-                detailed_desc = await conn.fetchrow(
-                    """
-                    SELECT description
-                    FROM ctgov.detailed_descriptions
-                    WHERE nct_id = $1
-                    """,
-                    study["nct_id"],
-                )
-                if detailed_desc:
-                    study_dict["detailed_description"] = detailed_desc["description"]
+                if study_dict["interventions"] is None:
+                    study_dict["interventions"] = []
+                else:
+                    study_dict["interventions"] = json.loads(study_dict["interventions"])
 
-                # Get condition data
-                conditions = await conn.fetch(
-                    """
-                    SELECT name
-                    FROM ctgov.conditions
-                    WHERE nct_id = $1
-                    """,
-                    study["nct_id"],
-                )
-                study_dict["conditions"] = [c["name"] for c in conditions]
-
-                # Get intervention data
-                interventions = await conn.fetch(
-                    """
-                    SELECT intervention_type, name, description
-                    FROM ctgov.interventions
-                    WHERE nct_id = $1
-                    """,
-                    study["nct_id"],
-                )
-                study_dict["interventions"] = [dict(i) for i in interventions]
-
-                # Get eligibility criteria
-                eligibility = await conn.fetchrow(
-                    """
-                    SELECT criteria, gender, minimum_age, maximum_age
-                    FROM ctgov.eligibilities
-                    WHERE nct_id = $1
-                    """,
-                    study["nct_id"],
-                )
-                if eligibility:
-                    study_dict["eligibility"] = dict(eligibility)
+                if study_dict["eligibility"] is None:
+                    study_dict["eligibility"] = {}
+                else:
+                    study_dict["eligibility"] = json.loads(study_dict["eligibility"])
 
                 result.append(study_dict)
 
@@ -334,154 +245,3 @@ class PostgresConnector:
                             condition_id,
                             relevance,
                         )
-
-                # 2. Insert mechanism categories
-                if "mechanisms" in tags_data:
-                    for mechanism in tags_data["mechanisms"]:
-                        # First ensure the mechanism exists in mechanism_categories table
-                        mechanism_id = await conn.fetchval(
-                            """
-                            INSERT INTO ctsearch.mechanism_categories (mechanism_name)
-                            VALUES ($1)
-                            ON CONFLICT (mechanism_name) DO UPDATE SET mechanism_name = $1
-                            RETURNING id
-                            """,
-                            mechanism,
-                        )
-
-                        # Then link it to the trial with relevance score
-                        relevance = 5  # Default high relevance
-                        await conn.execute(
-                            """
-                            INSERT INTO ctsearch.trial_mechanisms
-                            (nct_id, mechanism_id, relevance_score)
-                            VALUES ($1, $2, $3)
-                            ON CONFLICT (nct_id, mechanism_id) DO UPDATE SET
-                            relevance_score = $3
-                            """,
-                            nct_id,
-                            mechanism_id,
-                            relevance,
-                        )
-
-                # 3. Insert treatment targets
-                if "treatment_targets" in tags_data:
-                    for target in tags_data["treatment_targets"]:
-                        # First ensure the target exists in treatment_targets table
-                        # For simplicity, not setting target_type here
-                        target_id = await conn.fetchval(
-                            """
-                            INSERT INTO ctsearch.treatment_targets (target_name)
-                            VALUES ($1)
-                            ON CONFLICT (target_name) DO UPDATE SET target_name = $1
-                            RETURNING id
-                            """,
-                            target,
-                        )
-
-                        # Then link it to the trial
-                        await conn.execute(
-                            """
-                            INSERT INTO ctsearch.trial_targets
-                            (nct_id, target_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (nct_id, target_id) DO NOTHING
-                            """,
-                            nct_id,
-                            target_id,
-                        )
-
-                # 4. Insert simplified eligibility
-                if "simplified_eligibility" in tags_data:
-                    await conn.execute(
-                        """
-                        INSERT INTO ctsearch.simplified_eligibility
-                        (nct_id, summary)
-                        VALUES ($1, $2)
-                        ON CONFLICT (nct_id) DO UPDATE SET
-                        summary = $2
-                        """,
-                        nct_id,
-                        tags_data["simplified_eligibility"],
-                    )
-
-                # 5. Insert inclusion criteria
-                if "inclusion_criteria" in tags_data:
-                    for criteria in tags_data["inclusion_criteria"]:
-                        # First ensure the criteria exists in criteria_tags table
-                        criteria_id = await conn.fetchval(
-                            """
-                            INSERT INTO ctsearch.criteria_tags (criteria_name, criteria_type)
-                            VALUES ($1, 'inclusion')
-                            ON CONFLICT (criteria_name, criteria_type) DO UPDATE SET
-                            criteria_name = $1
-                            RETURNING id
-                            """,
-                            criteria,
-                        )
-
-                        # Then link it to the trial
-                        await conn.execute(
-                            """
-                            INSERT INTO ctsearch.trial_criteria
-                            (nct_id, criteria_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (nct_id, criteria_id) DO NOTHING
-                            """,
-                            nct_id,
-                            criteria_id,
-                        )
-
-                # 6. Insert exclusion criteria
-                if "exclusion_criteria" in tags_data:
-                    for criteria in tags_data["exclusion_criteria"]:
-                        # First ensure the criteria exists in criteria_tags table
-                        criteria_id = await conn.fetchval(
-                            """
-                            INSERT INTO ctsearch.criteria_tags (criteria_name, criteria_type)
-                            VALUES ($1, 'exclusion')
-                            ON CONFLICT (criteria_name, criteria_type) DO UPDATE SET
-                            criteria_name = $1
-                            RETURNING id
-                            """,
-                            criteria,
-                        )
-
-                        # Then link it to the trial
-                        await conn.execute(
-                            """
-                            INSERT INTO ctsearch.trial_criteria
-                            (nct_id, criteria_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (nct_id, criteria_id) DO NOTHING
-                            """,
-                            nct_id,
-                            criteria_id,
-                        )
-
-                # 7. Insert disease stage relevance
-                if "stage_relevance" in tags_data:
-                    for stage, score in tags_data["stage_relevance"].items():
-                        # First get the stage ID (assuming stages were pre-inserted)
-                        stage_id = await conn.fetchval(
-                            """
-                            SELECT id FROM ctsearch.disease_stages
-                            WHERE stage_name = $1
-                            """,
-                            stage,
-                        )
-
-                        if stage_id:
-                            # Then link it to the trial with relevance score
-                            await conn.execute(
-                                """
-                                INSERT INTO ctsearch.trial_stage_relevance
-                                (nct_id, stage_id, relevance_score)
-                                VALUES ($1, $2, $3)
-                                ON CONFLICT (nct_id, stage_id) DO UPDATE SET
-                                relevance_score = $3
-                                """,
-                                nct_id,
-                                stage_id,
-                                score,
-                            )

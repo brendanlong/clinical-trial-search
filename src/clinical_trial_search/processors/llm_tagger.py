@@ -119,11 +119,8 @@ Based on this information, provide the following in JSON format:
 
 1. Standardized condition tags (normalize different terms for the same condition)
 2. Categorize the trial by primary mechanism (e.g., immunotherapy, targeted therapy, chemotherapy)
-3. Simplified eligibility summary (in plain language bullets)
-4. Key inclusion criteria tags (e.g., "no prior treatment", "recurrent disease")
-5. Key exclusion criteria tags (e.g., "brain metastases", "autoimmune disease")
-6. Treatment target tags (e.g., specific genes, proteins, pathways)
-7. Assign a relevance score (1-5) for each stage of disease (early, locally advanced, recurrent/metastatic)
+3. Key inclusion criteria tags (e.g., "no prior treatment", "recurrent disease")
+4. Key exclusion criteria tags (e.g., "brain metastases", "autoimmune disease")
 
 Your response should ONLY be properly formatted JSON with these fields.
 """  # noqa

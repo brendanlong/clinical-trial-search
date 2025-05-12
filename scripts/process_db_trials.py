@@ -29,7 +29,7 @@ async def process_trials(
     db_connector: PostgresConnector,
     llm_processor: LLMProcessor,
     batch_size: int = 5,
-    max_trials: int = sys.maxsize,
+    max_trials: int | None = None,
 ) -> int:
     """Process a batch of unprocessed trials from the database.
 
@@ -50,9 +50,9 @@ async def process_trials(
 
     while True:
         # Check if we've reached the maximum number of trials
-        if processed_count >= max_trials:
+        if max_trials is not None and processed_count >= max_trials:
             break
-        current_batch_size = min(batch_size, remaining)
+        current_batch_size = batch_size if remaining is None else min(batch_size, remaining)
 
         # Get a batch of unprocessed trials
         trials = await db_connector.find_unprocessed_trials(limit=current_batch_size)
@@ -85,10 +85,12 @@ async def process_trials(
                 "InterventionName": [i.get("name", "") for i in trial.get("interventions", [])],
                 "EligibilityCriteria": trial.get("eligibility", {}).get("criteria", ""),
             }
+            logger.debug(f"LLM input: {llm_input}")
 
             # Process the trial with LLM
             processed_trial = await llm_processor.generate_trial_tags(llm_input)
             llm_tags = processed_trial.get("llm_generated_tags", {})
+            logger.debug(f"LLM tags: {llm_tags}")
 
             # Check if processing was successful
             success = "error" not in llm_tags
